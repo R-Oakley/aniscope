@@ -1,10 +1,11 @@
-import { anilistClient } from "@/lib/anilist/client";
-import { trendingAnimeQuery } from "./queries";
+"use client";
 
-export async function TrendingAnimeList() {
-  const data = await anilistClient.request(trendingAnimeQuery, {
-    perPage: 10,
-  });
+import { useSuspenseQuery } from "@tanstack/react-query";
+
+import { trendingAnimeQueryOptions } from "./query-options";
+
+export function TrendingAnimeList({ perPage }: { perPage: number }) {
+  const { data } = useSuspenseQuery(trendingAnimeQueryOptions(perPage));
   const media = data.Page?.media ?? [];
 
   return (
