@@ -1,0 +1,52 @@
+I want to use this repository as a learning project for modern React/Next.js development.
+
+The project will be an anime discovery app called AniScope.
+
+The main technologies I want to practice are:
+
+- Next.js with the App Router
+- React Server Components and Client Components
+- TanStack Query v5
+- GraphQL
+- GraphQL Code Generator
+- graphql-request
+- TypeScript
+- Tailwind CSS
+
+The external API will be the public AniList GraphQL API.
+
+I am not building my own backend or GraphQL server. The purpose is to practice consuming an existing GraphQL ecosystem, which is closer to the environment I will be moving into at work.
+
+The app should eventually support:
+
+- a homepage showing trending/popular anime
+- search
+- filters such as genre, format, status, and season
+- pagination or infinite scrolling
+- anime detail pages
+- characters and related media
+- recommendations
+- loading and error states
+- TanStack Query caching
+- query prefetching
+- server-side prefetching and hydration
+- GraphQL Codegen types
+- eventually, possibly authenticated AniList mutations, but NOT initially
+
+This is primarily a learning project, not a production product.
+
+Important:
+- Do not build everything at once.
+- Teach me the reasoning behind important architectural choices.
+- Prefer small vertical slices.
+- Before making significant changes, explain what should run on the server vs the client, where state should live, how TanStack Query is involved, and what GraphQL operation is needed.
+- Avoid unnecessary useEffect usage.
+- Avoid duplicating server state into React state.
+- Avoid putting everything behind "use client".
+- Prefer feature-based organization.
+
+First, inspect the existing repository and tell me what is already present.
+
+Then propose a high-level architecture and an implementation order.
+
+Do not change any files yet.
