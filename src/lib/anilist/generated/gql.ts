@@ -14,9 +14,11 @@ import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/
  * Learn more about it here: https://the-guild.dev/graphql/codegen/plugins/presets/preset-client#reducing-bundle-size
  */
 type Documents = {
+    "\n  query AnimeDetail($id: Int!) {\n    Media(id: $id, type: ANIME) {\n      id\n      title {\n        romaji\n        english\n      }\n      description(asHtml: false)\n      coverImage {\n        large\n      }\n      bannerImage\n      format\n      status\n      episodes\n      duration\n      genres\n      averageScore\n      startDate {\n        year\n        month\n        day\n      }\n      studios(isMain: true) {\n        nodes {\n          name\n        }\n      }\n    }\n  }\n": typeof types.AnimeDetailDocument,
     "\n  query TrendingAnime($perPage: Int) {\n    Page(perPage: $perPage) {\n      media(sort: TRENDING_DESC, type: ANIME) {\n        id\n        title {\n          romaji\n          english\n        }\n        coverImage {\n          large\n        }\n        format\n        episodes\n        averageScore\n      }\n    }\n  }\n": typeof types.TrendingAnimeDocument,
 };
 const documents: Documents = {
+    "\n  query AnimeDetail($id: Int!) {\n    Media(id: $id, type: ANIME) {\n      id\n      title {\n        romaji\n        english\n      }\n      description(asHtml: false)\n      coverImage {\n        large\n      }\n      bannerImage\n      format\n      status\n      episodes\n      duration\n      genres\n      averageScore\n      startDate {\n        year\n        month\n        day\n      }\n      studios(isMain: true) {\n        nodes {\n          name\n        }\n      }\n    }\n  }\n": types.AnimeDetailDocument,
     "\n  query TrendingAnime($perPage: Int) {\n    Page(perPage: $perPage) {\n      media(sort: TRENDING_DESC, type: ANIME) {\n        id\n        title {\n          romaji\n          english\n        }\n        coverImage {\n          large\n        }\n        format\n        episodes\n        averageScore\n      }\n    }\n  }\n": types.TrendingAnimeDocument,
 };
 
@@ -34,6 +36,10 @@ const documents: Documents = {
  */
 export function graphql(source: string): unknown;
 
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query AnimeDetail($id: Int!) {\n    Media(id: $id, type: ANIME) {\n      id\n      title {\n        romaji\n        english\n      }\n      description(asHtml: false)\n      coverImage {\n        large\n      }\n      bannerImage\n      format\n      status\n      episodes\n      duration\n      genres\n      averageScore\n      startDate {\n        year\n        month\n        day\n      }\n      studios(isMain: true) {\n        nodes {\n          name\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query AnimeDetail($id: Int!) {\n    Media(id: $id, type: ANIME) {\n      id\n      title {\n        romaji\n        english\n      }\n      description(asHtml: false)\n      coverImage {\n        large\n      }\n      bannerImage\n      format\n      status\n      episodes\n      duration\n      genres\n      averageScore\n      startDate {\n        year\n        month\n        day\n      }\n      studios(isMain: true) {\n        nodes {\n          name\n        }\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

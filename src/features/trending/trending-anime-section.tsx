@@ -25,7 +25,7 @@ function TrendingAnimeSkeleton({ perPage }: { perPage: number }) {
       {Array.from({ length: perPage }).map((_, i) => (
         <li
           key={i}
-          className="aspect-[2/3] w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800"
+          className="aspect-2/3 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800"
         />
       ))}
     </ul>
