@@ -2,7 +2,7 @@ import { graphql } from "@/lib/anilist/generated";
 
 export const animeDetailQuery = graphql(`
   query AnimeDetail($id: Int!) {
-    Media(id: $id, type: ANIME) {
+    Media(id: $id, type: ANIME, isAdult: false) {
       id
       title {
         romaji

@@ -1,9 +1,9 @@
 import { graphql } from "@/lib/anilist/generated";
 
-export const trendingAnimeQuery = graphql(`
-  query TrendingAnime($perPage: Int) {
+export const searchAnimeQuery = graphql(`
+  query SearchAnime($query: String!, $perPage: Int) {
     Page(perPage: $perPage) {
-      media(sort: TRENDING_DESC, type: ANIME, isAdult: false) {
+      media(search: $query, type: ANIME, isAdult: false) {
         id
         title {
           romaji

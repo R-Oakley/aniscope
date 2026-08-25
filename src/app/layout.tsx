@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
 
 import { Providers } from "@/lib/query/providers";
@@ -26,7 +27,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
+        <Providers>
+          <nav className="flex gap-4 border-b border-zinc-200 px-8 py-4 dark:border-zinc-800">
+            <Link href="/" className="font-medium">
+              AniScope
+            </Link>
+            <Link href="/search" className="text-zinc-500">
+              Search
+            </Link>
+          </nav>
+          {children}
+        </Providers>
       </body>
     </html>
   );

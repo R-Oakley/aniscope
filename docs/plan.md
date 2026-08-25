@@ -100,11 +100,34 @@ Confirmed so far:
   `src/app/anime/[id]/page.tsx` (parses/validates the numeric id, 404s on non-numeric ids). Also
   wrapped each trending card in `next/link` so the route is reachable from the UI.
 
+- **Slice 4 — Search.** Fully client-driven, no server prefetch at all (there's no default search
+  term to prefetch). `src/features/search/search-input.tsx` (client): local `useState` for
+  instant keystroke echo, debounced via a `setTimeout` held in a `ref` (reset inside `onChange`,
+  not `useEffect` — this reacts to a single event, not to synchronizing with an external system on
+  mount), commits to the URL (`?q=`) via `router.replace(..., { scroll: false })`.
+  `src/features/search/search-results.tsx` (client): reads `useSearchParams().get('q')`, uses
+  plain `useQuery` (not `useSuspenseQuery` — "no query typed" is a real empty state, not a loading
+  state, and `enabled: false` needs plain `useQuery`) with `placeholderData: keepPreviousData` so
+  results don't flash to blank between keystrokes. Added `src/components/anime-card.tsx`, a shared
+  presentational component extracted from trending + search's near-identical card markup (real
+  dedup, two call sites) — deliberately did **not** extract a shared GraphQL fragment for the two
+  queries' field selections yet (would be premature with only two consumers; revisit once a third
+  shows up, e.g. recommendations in slice 7). Added a small nav in `src/app/layout.tsx` so
+  `/search` is reachable.
+
+- **Out-of-band fix — adult content filtering.** User flagged mature content appearing in search
+  results in a work environment. Added `isAdult: false` as a hardcoded query argument (not a
+  variable/toggle — deliberately simple, a fixed safe default rather than a preference to build a
+  UI for) to all three `media`/`Media` selections: `trending/queries.ts`, `search/queries.ts`, and
+  `anime-detail/queries.ts`. Confirmed against the live API that this argument filters
+  server-side (AniList excludes the results entirely, not just a client-side hide) — verified with
+  a search term known to surface adult titles, with and without the argument, before and after
+  applying it. The detail page's `Media(id, isAdult: false)` means a direct link to an adult
+  title now resolves through the existing `notFound()` path, same as slice 3's nonexistent-id
+  case.
+
 ### Up next
 
-- **Slice 4 — Search.** A client `<input>` whose value lives in the URL (`?q=`), debounced, driving
-  a `useQuery` (not prefetched server-side initially, since it's user-initiated). Introduces
-  reading/writing `searchParams` from a Client Component.
 - **Slice 5 — Filters** (genre, format, status, season). Composed into the same URL-state query as
   search; likely a `useSearchParams` + `useRouter`/`Link` pattern for updating the URL without a
   full navigation.
@@ -142,3 +165,19 @@ re-explain from zero, but also don't assume mastery we haven't checked.
   repeat visits. Current real benefit = avoiding the double-fetch (server + redundant client fetch
   on mount), same as slice 2. Cross-navigation cache reuse requires a future client-initiated read
   of the same query key (not yet exercised).
+- Slice 4: local input state vs. URL state and why both are needed (not duplication); debouncing
+  via a ref-held `setTimeout` in an event handler instead of `useEffect`; `useQuery` +
+  `enabled: false` vs. `useSuspenseQuery` for a genuine empty state; deferring a GraphQL fragment
+  extraction until a third consumer exists. *Confirmed via Q&A.* Also covered, after an initial gap
+  in understanding: why `placeholderData: keepPreviousData` lives at the `useQuery` call site in
+  `search-results.tsx` rather than inside the shared `searchAnimeQueryOptions` — shared options
+  describe the data's identity (queryKey/queryFn/enabled, true for any consumer), call-site options
+  describe one view's presentation choice. Bigger gap, now resolved: `SearchInput` and
+  `SearchResults` have no direct connection (no props/callbacks) — they're linked only through the
+  URL. Traced the full path: keystroke → local `setValue` → debounced `router.replace` writes
+  `?q=` → navigation re-renders both under `/search/page.tsx` → `SearchResults` independently reads
+  `useSearchParams().get('q')` → feeds `searchAnimeQueryOptions(query)` → new `queryKey` → TanStack
+  Query calls `queryFn` (the actual AniList request) only if that key isn't already cached. Also:
+  two mechanisms limit request volume, not just debounce — debounce collapses keystrokes to one
+  committed value, and TanStack Query's cache means revisiting an already-fetched value (e.g.
+  backspacing back to a prior search) fires no additional request.
