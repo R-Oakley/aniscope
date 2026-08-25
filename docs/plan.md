@@ -101,6 +101,14 @@ this project's feature-folder colocation preference)**:
   produced a URL of `/search?` (dangling `?`) instead of `/search` — fixed in `search-input.tsx`
   to omit the `?` when the query string is empty, not just adjusted the test to match.
 
+*Comprehension confirmed via Q&A*: why `next/navigation` needs mocking (its hooks throw outside a
+router context) vs. `next/link` not needing it (degrades gracefully instead of throwing — a
+nuance added on top of a mostly-correct initial answer); what actually happens if
+`jest.advanceTimersByTime` is called without `jest.useFakeTimers()` first — verified empirically
+by temporarily removing it and reading the real error, rather than answering from memory (Jest
+throws "timers APIs are not replaced with fake timers," it does not silently no-op or roll real
+time forward).
+
 ## Slice status
 
 ### Done
@@ -160,11 +168,39 @@ this project's feature-folder colocation preference)**:
   title now resolves through the existing `notFound()` path, same as slice 3's nonexistent-id
   case.
 
+- **Slice 5 — Filters** (genre, format, status, season) on the `/search` page. Single-select
+  dropdowns, not multi-select — deliberate scoping, multi-select genre needs real URL-array
+  encoding that isn't needed yet. Genre list hardcoded against AniList's live `GenreCollection`
+  (verified via curl), `Hentai` excluded consistent with the `isAdult: false` fix; format list
+  restricted to anime-relevant `MediaFormat` values only (excludes manga-only enum values that
+  would just return zero results against `type: ANIME`). **Real bug caught before it shipped**:
+  verified directly against the live API that AniList treats `search: ""` (explicit empty string)
+  as "match nothing," not "no search filter" — different from omitting the argument. Slice 4 never
+  hit this because `enabled` guaranteed real text was always present; slice 5's filter-only
+  browsing (pick a genre, type nothing) would have silently returned zero results without fixing
+  `searchAnimeQueryOptions` to send `undefined` (not the trimmed empty string) when there's no
+  text — caught by testing against the real API before writing the fix, not discovered later via
+  a broken UI. Also required an explicit `sort: POPULARITY_DESC` on the query — filter-only
+  queries with no sort returned empty results in testing, sorted ones didn't.
+  `FilterBar` needs no debounce and no local `useState` at all (unlike `SearchInput`) — a
+  `<select>` firing is one discrete event, not a keystroke stream, so each dropdown just reads
+  straight from `searchParams.get(...)`. Added `src/features/search/filter-bar.tsx` (with a small
+  internal `FilterSelect` sub-component — genuine 4x same-file duplication, not premature
+  abstraction), updated `query-options.ts` (`SearchFilters` type derived from the generated
+  `SearchAnimeQueryVariables` rather than redeclared) and `search-results.tsx` to read/pass
+  filters, updated `search/queries.ts` with the new optional GraphQL variables.
+  **Tests written alongside the code** (per the sequencing decision in Testing, above — first
+  slice where this was standard practice rather than a separate pass): `query-options.test.ts`
+  gained a regression test for the empty-string landmine (mocks `anilistClient.request`, asserts
+  the actual variables sent) and an `enabled`-via-filter-only test; `filter-bar.test.tsx` covers
+  writing/clearing a param and preserving other active filters when changing one — no fake timers
+  needed, unlike `search-input.test.tsx`. **Also fixed a gap in the Jest setup itself**: `next/jest`
+  does not pick up the `@/*` path alias from `tsconfig.json` automatically (a manual
+  `moduleNameMapper` step per Next's own docs, easy to miss since every test until now used
+  relative imports or bare package names) — added to `jest.config.ts`.
+
 ### Up next
 
-- **Slice 5 — Filters** (genre, format, status, season). Composed into the same URL-state query as
-  search; likely a `useSearchParams` + `useRouter`/`Link` pattern for updating the URL without a
-  full navigation.
 - **Slice 6 — Pagination / infinite scroll.** `useInfiniteQuery`, AniList's `Page(page, perPage)`
   pagination info.
 - **Slice 7 — Characters, related media, recommendations** on the detail page. More GraphQL
@@ -215,3 +251,18 @@ re-explain from zero, but also don't assume mastery we haven't checked.
   two mechanisms limit request volume, not just debounce — debounce collapses keystrokes to one
   committed value, and TanStack Query's cache means revisiting an already-fetched value (e.g.
   backspacing back to a prior search) fires no additional request.
+- Slice 5: why `FilterBar` needs neither debounce nor local `useState` (a `<select>` firing is one
+  discrete event, not a keystroke stream — contrast with `SearchInput`); folding multiple filter
+  values into one `queryKey` so distinct filter combinations cache separately; deriving
+  `SearchFilters` from the generated `SearchAnimeQueryVariables` type instead of redeclaring it;
+  verifying API-specific behavior (empty-string search, missing-sort-on-filter-only-queries)
+  against the live API before writing code around it, rather than assuming. *Explained in depth at
+  user's request rather than guessed through.* **Known current gap surfaced during this
+  explanation, not yet fixed**: the `as SearchFilters["format"]` (etc.) casts in
+  `search-results.tsx` are type assertions, not runtime validation — safe for every path through
+  our own `FilterBar` UI (which only ever writes its own known-good option values), but a
+  hand-edited URL like `/search?format=banana` would flow straight through to AniList as an
+  invalid enum value and come back as a GraphQL error we don't currently handle (no `error.tsx`
+  yet — slice 8). Contrast with slice 3's `Number.isInteger` check, which *was* real validation at
+  a trust boundary. Follow-up: validate filter values against the known `FORMATS`/`STATUSES`/
+  `SEASONS` lists and drop invalid ones instead of trusting the cast.

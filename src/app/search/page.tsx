@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { FilterBar } from "@/features/search/filter-bar";
 import { SearchInput } from "@/features/search/search-input";
 import { SearchResults } from "@/features/search/search-results";
 
@@ -10,6 +11,7 @@ export default function SearchPage() {
       <Suspense fallback={<p className="text-zinc-500">Loading search…</p>}>
         <div className="flex flex-col gap-6">
           <SearchInput />
+          <FilterBar />
           <SearchResults />
         </div>
       </Suspense>

@@ -9,6 +9,11 @@ const config: Config = {
   coverageProvider: "v8",
   testEnvironment: "jsdom",
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
+  // next/jest does not pick up the "@/*" path alias from tsconfig.json on
+  // its own — this mirrors tsconfig's "@/*": ["./src/*"] mapping.
+  moduleNameMapper: {
+    "^@/(.*)$": "<rootDir>/src/$1",
+  },
 };
 
 export default createJestConfig(config);
