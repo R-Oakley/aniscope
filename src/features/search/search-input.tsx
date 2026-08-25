@@ -26,7 +26,10 @@ export function SearchInput() {
       } else {
         params.delete("q");
       }
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      const queryString = params.toString();
+      router.replace(queryString ? `${pathname}?${queryString}` : pathname, {
+        scroll: false,
+      });
     }, DEBOUNCE_MS);
   }
 

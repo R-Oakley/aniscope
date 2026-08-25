@@ -67,6 +67,40 @@ Confirmed so far:
 - **No `useEffect` for data fetching**, ever — Server Component `await`/`prefetchQuery` or
   TanStack Query hooks cover every case in this app.
 
+## Testing
+
+Jest + React Testing Library, set up via `next/jest` (auto-configures the Next.js compiler
+transform, CSS/font/image mocking, module aliases). `jest.config.ts` + `jest.setup.ts` at the
+repo root; `npm test` / `npm run test:watch`.
+
+**Hard constraint (from Next's own docs, `node_modules/next/dist/docs/01-app/02-guides/testing/jest.md`):
+Jest cannot render/unit-test `async` Server Components at all** — not a config limitation, a
+fundamental one (Jest has no way to await a component mid-render). Since every Server Component in
+this app is `async` (`TrendingAnimeSection`, `AnimeDetailSection`, both `page.tsx` files), none of
+that prefetch/hydrate/`notFound()` logic is Jest-testable. Coverage there would require E2E tooling
+(Playwright — discussed, not yet installed) as a separate future decision, not something to force
+into Jest. What Jest *can* cover: plain functions (`*QueryOptions`), synchronous Client Components,
+and non-trivial client-side logic (debouncing, event handlers).
+
+**Sequencing decision**: rather than a full mechanical backfill of tests across slices 1-4 (most of
+those Server-section/Client-list pairs are structurally identical — low teaching value repeated
+four times), set up Jest and wrote a small, deliberately representative set of tests against
+existing code to establish the whole toolkit, then write tests alongside new code from slice 5
+onward as standard practice rather than a separate catch-up phase.
+
+**Representative tests written (colocated as `*.test.ts(x)` next to the file under test, matching
+this project's feature-folder colocation preference)**:
+- `src/features/search/query-options.test.ts` — plain function test, no rendering. Covers the
+  `enabled`-on-empty-string and trim-for-cache-key logic.
+- `src/components/anime-card.test.tsx` — sync Client Component, `render`/`screen` from RTL. Covers
+  title fallback chain (english → romaji → "Untitled"), link href, conditional cover image.
+- `src/features/search/search-input.test.tsx` — the centerpiece: mocks `next/navigation`'s
+  `useRouter`/`usePathname`/`useSearchParams` (the component can't run its real hooks outside an
+  actual Next.js router), uses `jest.useFakeTimers()` + `userEvent.setup({ delay: null })` to test
+  the debounce deterministically without real waiting. **Caught a real bug**: clearing the input
+  produced a URL of `/search?` (dangling `?`) instead of `/search` — fixed in `search-input.tsx`
+  to omit the `?` when the query string is empty, not just adjusted the test to match.
+
 ## Slice status
 
 ### Done
