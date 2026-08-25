@@ -199,10 +199,26 @@ time forward).
   `moduleNameMapper` step per Next's own docs, easy to miss since every test until now used
   relative imports or bare package names) — added to `jest.config.ts`.
 
+- **Slice 6 — Pagination on `/search` results only** (trending stays a fixed top-10 — "trending" is
+  inherently a bounded top-N snapshot, deliberately not made infinite). Converted
+  `searchAnimeQueryOptions` from `queryOptions` to `infiniteQueryOptions`; `SearchResults` swapped
+  `useQuery` for `useInfiniteQuery`. Chose a **"Load more" button** over true scroll-triggered
+  auto-loading (user's call, presented as a genuine fork) — keeps this slice focused purely on
+  `useInfiniteQuery` mechanics with no new browser APIs or `useEffect` involved; true infinite
+  scroll (`IntersectionObserver` + `useEffect` as a legitimate, correct use of an effect — a good
+  future contrast to slice 4's deliberate *avoidance* of `useEffect` for the debounce) is a natural
+  later enhancement, not done here. Page number is **not** URL state (unlike `q`/filters) and not
+  component state either — `useInfiniteQuery` owns it internally via `data.pages`; deliberately
+  not bookmarkable, since nobody bookmarks "page 3 of these results." Added `$page: Int` and
+  `pageInfo { hasNextPage }` to the `SearchAnime` query; `getNextPageParam` uses the third
+  argument (`lastPageParam`) rather than reading a `currentPage` back out of the response —
+  simpler, one fewer field to select. Verified against the live API that page 1 and page 2 return
+  genuinely different, non-overlapping results and `hasNextPage` reports correctly. Tests added:
+  `getNextPageParam` returns `lastPageParam + 1` when more pages exist, `undefined` when
+  `hasNextPage` is false.
+
 ### Up next
 
-- **Slice 6 — Pagination / infinite scroll.** `useInfiniteQuery`, AniList's `Page(page, perPage)`
-  pagination info.
 - **Slice 7 — Characters, related media, recommendations** on the detail page. More GraphQL
   fields/operations, nested `Suspense` boundaries so slow sections don't block the whole page.
 - **Slice 8 — Loading/error polish.** Route-level `loading.tsx`/`error.tsx`, meaningful skeletons
@@ -266,3 +282,9 @@ re-explain from zero, but also don't assume mastery we haven't checked.
   yet — slice 8). Contrast with slice 3's `Number.isInteger` check, which *was* real validation at
   a trust boundary. Follow-up: validate filter values against the known `FORMATS`/`STATUSES`/
   `SEASONS` lists and drop invalid ones instead of trusting the cast.
+- Slice 6: why page number lives in neither the URL nor component state, but inside
+  `useInfiniteQuery` itself; `getNextPageParam`'s three-argument shape and why using
+  `lastPageParam` is simpler than selecting `currentPage` back out of the response; why the
+  `queryKey` deliberately excludes the page number (distinguishes *searches*, not *pages of a
+  search*) — contrast with slice 5's key, which deliberately *does* include every filter.
+  *Explained; comprehension check pending.*

@@ -41,18 +41,44 @@ describe("searchAnimeQueryOptions", () => {
 
   it("sends undefined, not an empty string, as the search variable when there is no text", async () => {
     const requestMock = anilistClient.request as jest.Mock;
-    requestMock.mockResolvedValue({ Page: { media: [] } });
+    requestMock.mockResolvedValue({ Page: { media: [], pageInfo: { hasNextPage: false } } });
 
     const options = searchAnimeQueryOptions("   ", { genre: "Action" });
     // queryFn's real signature takes a TanStack QueryFunctionContext, but our
-    // implementation ignores it — a loose context stand-in is enough here.
-    await options.queryFn?.({ queryKey: options.queryKey } as never);
+    // implementation only reads pageParam off it — a loose stand-in is enough.
+    await options.queryFn?.({ queryKey: options.queryKey, pageParam: 1 } as never);
 
     // AniList treats search: "" as "match nothing" rather than "no filter" —
     // this asserts we never send the empty string it would misinterpret.
     expect(requestMock).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ query: undefined, genre: "Action" }),
+      expect.objectContaining({ query: undefined, genre: "Action", page: 1 }),
     );
+  });
+
+  describe("getNextPageParam", () => {
+    it("requests the next page number when AniList reports more pages exist", () => {
+      const options = searchAnimeQueryOptions("naruto");
+      const nextParam = options.getNextPageParam?.(
+        { Page: { pageInfo: { hasNextPage: true } } } as never,
+        [],
+        3, // the page we just fetched
+        [],
+      );
+
+      expect(nextParam).toBe(4);
+    });
+
+    it("stops paginating once hasNextPage is false", () => {
+      const options = searchAnimeQueryOptions("naruto");
+      const nextParam = options.getNextPageParam?.(
+        { Page: { pageInfo: { hasNextPage: false } } } as never,
+        [],
+        3,
+        [],
+      );
+
+      expect(nextParam).toBeUndefined();
+    });
   });
 });

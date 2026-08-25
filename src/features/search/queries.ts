@@ -3,13 +3,17 @@ import { graphql } from "@/lib/anilist/generated";
 export const searchAnimeQuery = graphql(`
   query SearchAnime(
     $query: String
+    $page: Int
     $perPage: Int
     $genre: String
     $format: MediaFormat
     $status: MediaStatus
     $season: MediaSeason
   ) {
-    Page(perPage: $perPage) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo {
+        hasNextPage
+      }
       media(
         search: $query
         type: ANIME

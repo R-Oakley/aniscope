@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 
 import { AnimeCard } from "@/components/anime-card";
@@ -20,7 +20,14 @@ export function SearchResults() {
   };
   const hasFilters = Object.values(filters).some(Boolean);
 
-  const { data, isLoading, isPlaceholderData } = useQuery({
+  const {
+    data,
+    isLoading,
+    isPlaceholderData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     ...searchAnimeQueryOptions(query, filters),
     placeholderData: keepPreviousData,
   });
@@ -35,7 +42,7 @@ export function SearchResults() {
     return <p className="text-zinc-500">Searching…</p>;
   }
 
-  const media = data?.Page?.media ?? [];
+  const media = data?.pages.flatMap((page) => page.Page?.media ?? []) ?? [];
 
   if (media.length === 0) {
     return (
@@ -46,19 +53,26 @@ export function SearchResults() {
   }
 
   return (
-    <ul
-      className={`grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5 ${
-        isPlaceholderData ? "opacity-50" : ""
-      }`}
-    >
-      {media.map(
-        (anime) =>
-          anime && (
-            <li key={anime.id}>
-              <AnimeCard anime={anime} />
-            </li>
-          ),
+    <div className={isPlaceholderData ? "opacity-50" : ""}>
+      <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5">
+        {media.map(
+          (anime) =>
+            anime && (
+              <li key={anime.id}>
+                <AnimeCard anime={anime} />
+              </li>
+            ),
+        )}
+      </ul>
+      {hasNextPage && (
+        <button
+          onClick={() => fetchNextPage()}
+          disabled={isFetchingNextPage}
+          className="mt-6 rounded border border-zinc-300 px-4 py-2 text-sm disabled:opacity-50 dark:border-zinc-700"
+        >
+          {isFetchingNextPage ? "Loading…" : "Load more"}
+        </button>
       )}
-    </ul>
+    </div>
   );
 }
