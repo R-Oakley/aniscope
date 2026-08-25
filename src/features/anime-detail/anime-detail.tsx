@@ -4,6 +4,25 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 
 import { animeDetailQueryOptions } from "./query-options";
 
+// AniList's `description(asHtml: false)` does NOT strip HTML — it returns
+// the raw stored text as-is, which frequently contains literal tags
+// (<br>, <b>, etc.) typed directly into the description by whoever wrote
+// it. This converts <br> variants to real newlines (rendered via
+// whitespace-pre-line) and strips everything else. We deliberately never
+// use asHtml: true + dangerouslySetInnerHTML here — that would mean
+// trusting third-party API content as safe HTML. Rendering the stripped
+// result as a plain string keeps this safe regardless of what's stripped:
+// React always escapes string children, so no HTML in this text can ever
+// be interpreted as markup.
+export function stripDescriptionHtml(description: string): string {
+  return description
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/?(p|ul|li|div)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export function AnimeDetail({ id }: { id: number }) {
   const { data } = useSuspenseQuery(animeDetailQueryOptions(id));
   const media = data.Media;
@@ -78,7 +97,7 @@ export function AnimeDetail({ id }: { id: number }) {
           )}
           {media.description && (
             <p className="max-w-2xl whitespace-pre-line text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
-              {media.description}
+              {stripDescriptionHtml(media.description)}
             </p>
           )}
         </div>

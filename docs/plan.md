@@ -217,10 +217,60 @@ time forward).
   `getNextPageParam` returns `lastPageParam + 1` when more pages exist, `undefined` when
   `hasNextPage` is false.
 
+- **Slice 7 — Characters, related media, recommendations** on the detail page. Three separate
+  GraphQL operations (`AnimeCharacters`, `AnimeRelations`, `AnimeRecommendations`), not fields
+  bolted onto the existing `AnimeDetail` query — GraphQL resolves one request atomically (no
+  partial response, AniList doesn't support `@defer`/`@stream`), so separate operations were
+  required to get independent `queryKey`s and therefore independent `Suspense` boundaries at all,
+  not just a style preference. **First real use of the `pending`-status `shouldDehydrateQuery`
+  clause added back in slice 2** (previously inert): the core detail query stays `await`ed as
+  before (needed for the `notFound()` decision), but characters/relations/recommendations are
+  `queryClient.prefetchQuery(...)` **without** `await`, each wrapped in its own `<Suspense>` — the
+  pending clause is what lets a still-resolving query ride along in the hydration payload and
+  stream into the response per-section, instead of the client needing a fresh fetch from scratch
+  after mount. **Precise correction to the initial pitch**: the three background queries don't all
+  start at function entry — they're kicked off only *after* the core query's `await` resolves
+  (sequential relative to the core fetch), then run concurrently *with each other* (not
+  sequentially relative to one another). The benefit isn't "all four requests race from t=0," it's
+  that the function's `return` doesn't block on the three finishing. `relations`/`recommendations`
+  both return full `Media` nodes shaped exactly like `AnimeCardData` — reused `<AnimeCard>`
+  directly, no new markup, validating the slice-4 decision to type it against a generic structural
+  interface rather than one specific generated query type. **Deliberately still not** extracting
+  the shared GraphQL fragment flagged back in slice 4, even though recommendations is now a third
+  (relations a fourth) consumer of the same field selection — fragment masking (the generated
+  `useFragment` helper, unused since slice 1) is a genuinely new concept, and bundling it into an
+  already-dense slice (parallel streaming + three new query shapes) would be too much new material
+  at once. Flagged as a clean, well-motivated follow-up. **Known accepted gap**: a failed
+  background prefetch doesn't get dehydrated (TanStack's default `shouldDehydrateQuery` doesn't
+  serialize error states, only success + our added pending case), so the client would retry fresh
+  after mount, and if that also fails, `useSuspenseQuery` throws with no error boundary yet to
+  catch it (still slice 8). Added `.catch(() => {})` on the three un-awaited prefetches purely to
+  stop Node's unhandled-rejection warning — explicitly not real error handling. Added
+  `characters-list.tsx`, `related-media-list.tsx` (exports `formatRelationType`, tested), and
+  `recommendations-list.tsx`, all client, all `useSuspenseQuery`. Verified against the live API
+  (One Piece, id 21) — real characters, related media, and recommendations render with real AniList
+  data, no errors.
+
+- **Out-of-band fix — raw HTML leaking through anime descriptions.** User caught this by actually
+  using the app (One Piece's description showed literal `<br><br>` and `<b>` text). Root cause:
+  slice 3's `description(asHtml: false)` choice was based on a wrong assumption —
+  `asHtml: false` does **not** strip HTML, it returns AniList's raw stored text as-is, and editors
+  frequently type literal HTML tags directly into that raw text. Verified against the live API
+  (One Piece, id 21) comparing `asHtml: false` vs `asHtml: true` output before writing any fix, to
+  see exactly what AniList actually returns rather than guessing. Considered switching to
+  `asHtml: true` + `dangerouslySetInnerHTML` (would render properly formatted paragraphs/lists),
+  but rejected it: that means trusting third-party API content as safe HTML, which is a real XSS
+  surface without a sanitization library in front of it — and pulling in a sanitizer felt like too
+  much weight for a description blurb. Instead added `stripDescriptionHtml` (exported from
+  `anime-detail.tsx`, tested against real One Piece description text) — converts `<br>` variants
+  to real newlines (rendered via the `whitespace-pre-line` already in place), strips every other
+  tag, and is safe by construction regardless of what's stripped: the result is still rendered as
+  a plain React string child, and React always escapes string children, so nothing in the
+  (possibly imperfectly stripped) output can ever be interpreted as markup. Verified fixed against
+  the live running page, not just the unit tests.
+
 ### Up next
 
-- **Slice 7 — Characters, related media, recommendations** on the detail page. More GraphQL
-  fields/operations, nested `Suspense` boundaries so slow sections don't block the whole page.
 - **Slice 8 — Loading/error polish.** Route-level `loading.tsx`/`error.tsx`, meaningful skeletons
   instead of generic spinners.
 - **Slice 9 (explicitly deferred) — authenticated AniList mutations.** Not started until
@@ -287,4 +337,17 @@ re-explain from zero, but also don't assume mastery we haven't checked.
   `lastPageParam` is simpler than selecting `currentPage` back out of the response; why the
   `queryKey` deliberately excludes the page number (distinguishes *searches*, not *pages of a
   search*) — contrast with slice 5's key, which deliberately *does* include every filter.
-  *Explained; comprehension check pending.*
+  *Confirmed via Q&A, with depth added on two points*: `getNextPageParam` is called automatically
+  by TanStack after every page resolves (including the first), not computed on-demand when
+  `fetchNextPage` is clicked — the next page number is already sitting there precomputed by click
+  time. And changing a filter doesn't "reset to page 1" via any pagination-aware code — it produces
+  a different `queryKey`, which `useInfiniteQuery` treats as a brand new query with no `data.pages`
+  yet, so it starts from `initialPageParam` for the first time; the *old* query (mid-scroll) stays
+  cached untouched, and `keepPreviousData` is what makes the visual transition dim rather than
+  flash empty.
+- Slice 7: why three separate GraphQL operations were structurally necessary (not stylistic) to
+  get independent `Suspense` boundaries — GraphQL has no partial-response mechanism here; why the
+  core detail query stays `await`ed while the other three don't (the `notFound()` decision depends
+  on it); the payoff of slice 2's previously-inert `pending` dehydration clause; the precise
+  (corrected) sequencing of the three background prefetches — after the core query, concurrent with
+  each other, not racing from function entry. *Explained; comprehension check pending.*

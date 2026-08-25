@@ -5,7 +5,15 @@ import { Suspense } from "react";
 import { getQueryClient } from "@/lib/query/get-query-client";
 
 import { AnimeDetail } from "./anime-detail";
-import { animeDetailQueryOptions } from "./query-options";
+import { CharactersList } from "./characters-list";
+import {
+  animeCharactersQueryOptions,
+  animeDetailQueryOptions,
+  animeRecommendationsQueryOptions,
+  animeRelationsQueryOptions,
+} from "./query-options";
+import { RecommendationsList } from "./recommendations-list";
+import { RelatedMediaList } from "./related-media-list";
 
 export async function AnimeDetailSection({ id }: { id: number }) {
   const queryClient = getQueryClient();
@@ -19,11 +27,39 @@ export async function AnimeDetailSection({ id }: { id: number }) {
     notFound();
   }
 
+  // Deliberately NOT awaited: these three stream into the response
+  // independently as each resolves, instead of blocking the whole page
+  // (including the already-resolved hero content above) on the slowest of
+  // them. The `pending`-status clause in get-query-client.ts's
+  // shouldDehydrateQuery is what makes an un-awaited prefetch like this
+  // still reach the client via the hydration payload. The .catch() is only
+  // to stop Node from logging an unhandled-rejection warning if one fails —
+  // it is not real error handling (that's still slice 8's job).
+  queryClient.prefetchQuery(animeCharactersQueryOptions(id)).catch(() => {});
+  queryClient.prefetchQuery(animeRelationsQueryOptions(id)).catch(() => {});
+  queryClient
+    .prefetchQuery(animeRecommendationsQueryOptions(id))
+    .catch(() => {});
+
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <Suspense fallback={<AnimeDetailSkeleton />}>
-        <AnimeDetail id={id} />
-      </Suspense>
+      <div className="flex flex-col gap-10">
+        <Suspense fallback={<AnimeDetailSkeleton />}>
+          <AnimeDetail id={id} />
+        </Suspense>
+
+        <Suspense fallback={<ListSkeleton />}>
+          <CharactersList id={id} />
+        </Suspense>
+
+        <Suspense fallback={<ListSkeleton />}>
+          <RelatedMediaList id={id} />
+        </Suspense>
+
+        <Suspense fallback={<ListSkeleton />}>
+          <RecommendationsList id={id} />
+        </Suspense>
+      </div>
     </HydrationBoundary>
   );
 }
@@ -37,6 +73,19 @@ function AnimeDetailSkeleton() {
         <div className="h-4 w-1/2 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
         <div className="h-24 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
       </div>
+    </div>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div
+          key={i}
+          className="aspect-2/3 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800"
+        />
+      ))}
     </div>
   );
 }

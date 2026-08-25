@@ -32,3 +32,73 @@ export const animeDetailQuery = graphql(`
     }
   }
 `);
+
+export const animeCharactersQuery = graphql(`
+  query AnimeCharacters($id: Int!) {
+    Media(id: $id, type: ANIME, isAdult: false) {
+      characters(sort: ROLE, perPage: 12) {
+        edges {
+          role
+          node {
+            id
+            name {
+              full
+            }
+            image {
+              medium
+            }
+          }
+        }
+      }
+    }
+  }
+`);
+
+export const animeRelationsQuery = graphql(`
+  query AnimeRelations($id: Int!) {
+    Media(id: $id, type: ANIME, isAdult: false) {
+      relations {
+        edges {
+          relationType
+          node {
+            id
+            title {
+              romaji
+              english
+            }
+            coverImage {
+              large
+            }
+            format
+            episodes
+            averageScore
+          }
+        }
+      }
+    }
+  }
+`);
+
+export const animeRecommendationsQuery = graphql(`
+  query AnimeRecommendations($id: Int!) {
+    Media(id: $id, type: ANIME, isAdult: false) {
+      recommendations(sort: RATING_DESC, perPage: 10) {
+        nodes {
+          mediaRecommendation {
+            id
+            title {
+              romaji
+              english
+            }
+            coverImage {
+              large
+            }
+            format
+            episodes
+            averageScore
+          }
+        }
+      }
+    }
+  }
+`);
