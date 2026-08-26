@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { Suspense } from "react";
 import "./globals.css";
 
+import { NavAuth } from "@/features/auth/nav-auth";
 import { Providers } from "@/lib/query/providers";
 
 const geistSans = Geist({
@@ -28,13 +30,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <Providers>
-          <nav className="flex gap-4 border-b border-zinc-200 px-8 py-4 dark:border-zinc-800">
-            <Link href="/" className="font-medium">
-              AniScope
-            </Link>
-            <Link href="/search" className="text-zinc-500">
-              Search
-            </Link>
+          <nav className="flex items-center justify-between gap-4 border-b border-zinc-200 px-8 py-4 dark:border-zinc-800">
+            <div className="flex gap-4">
+              <Link href="/" className="font-medium">
+                AniScope
+              </Link>
+              <Link href="/search" className="text-zinc-500">
+                Search
+              </Link>
+            </div>
+            <Suspense fallback={null}>
+              <NavAuth />
+            </Suspense>
           </nav>
           {children}
         </Providers>

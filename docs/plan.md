@@ -312,10 +312,113 @@ time forward).
   representative test for this slice — the rest are static skeleton/copy, low value to test
   exhaustively.
 
+- **Slice 9a — AniList OAuth sign-in (mutations themselves not started yet).** Slice 9 is too big
+  for one pass — broken into 9a (sign-in only), 9b (deferred), 9c (deferred, an actual mutation via
+  `useMutation`). User registered a real AniList OAuth application
+  (`anilist.co/settings/developer`) — Client ID `49518`, secret in `.env.local`
+  (`ANILIST_CLIENT_ID`/`ANILIST_CLIENT_SECRET`, gitignored). Verified AniList's actual OAuth docs
+  before writing anything (`anilist.gitbook.io/anilist-apiv2-docs`) rather than relying on
+  memory: Authorization Code Grant chosen deliberately over Implicit Grant (keeps the client
+  secret server-side); `grant_type=authorization_code` required; authenticated requests use
+  `Authorization: Bearer {token}`; access tokens are long-lived (~1 year) and AniList does **not**
+  support refresh tokens, which simplifies the design — no rotation logic needed, the session
+  cookie's `maxAge` just matches the token's lifetime. Also verified this Next version's `cookies()`
+  (async, `set`/`delete` only work in Server Functions or Route Handlers, not plain Server
+  Components) and `route.ts` conventions before writing any code, given two prior surprises this
+  project already hit from assuming instead of checking (the `retry` prop, the loading.tsx/404
+  interaction).
+
+  First use of **Route Handlers** in this app: `src/app/api/auth/login/route.ts` (redirects to
+  AniList's authorize URL, sets a random CSRF `state` cookie first), `callback/route.ts` (verifies
+  `state`, exchanges the code for a token server-side via `fetch`, sets an httpOnly access-token
+  cookie), `logout/route.ts` (clears it). The access token lives in an **httpOnly** cookie
+  deliberately — not TanStack Query, not React state — specifically so client-side JS can never
+  read it at all (XSS protection), unlike TanStack Query's cache which is plainly inspectable in
+  devtools. `src/lib/auth/session.ts` and `config.ts` both import the `server-only` package (a new
+  dependency, installed for this) so any accidental import of session/secret-handling code into a
+  Client Component fails at build time rather than relying on Next's own runtime guards alone.
+  Added `src/features/auth/get-viewer.ts` — the first *authenticated* GraphQL request in this app,
+  using `graphql-request`'s per-call `requestHeaders` third argument (verified its exact signature
+  against the installed v7 type definitions rather than assuming) rather than a second client
+  instance, since the token is per-user the same way a server `QueryClient` can't be a module-level
+  singleton. `src/features/auth/nav-auth.tsx` is an async Server Component wrapped in its own
+  `<Suspense>` in the root layout, so checking auth status doesn't block every page's render — same
+  discipline as slices 7/8. Sign-in/sign-out are plain `<a href="/api/...">` links, not `next/link`
+  — deliberate, since they navigate to Route Handlers that redirect, not to in-app routes, so
+  client-side prefetching/transitions don't apply.
+
+  **Verified as far as possible without a real browser OAuth flow** (curl can't click "Approve" on
+  AniList's own consent screen — this is the first slice where I can't verify the full path myself):
+  homepage renders "Sign in with AniList" with no cookie present; `/api/auth/login` redirects
+  (307) to exactly the right AniList URL with the correct `client_id`, URL-encoded `redirect_uri`,
+  `response_type=code`, and a random `state`; every other route still works unaffected. **Confirmed
+  by the user in a real browser**: signed in successfully (nav showed "Signed in as Yelkao85"),
+  sign-out also worked. Slice 9a is done.
+
+- **Slice 9c — first real mutation (`ToggleFavourite`).** 9b (broader auth-state exposure) turned
+  out unnecessary as its own slice — folded directly into 9c instead, small enough to not warrant
+  a separate pass. **Direct architectural consequence of 9a's httpOnly cookie choice**: a Client
+  Component cannot read the access token at all (that's the whole point of httpOnly), so it cannot
+  attach `Authorization: Bearer` itself — the mutation has to go through *our own server*, which
+  can read the cookie. First use of a **Server Action** (`src/features/anime-detail/actions.ts`,
+  `'use server'`) — different from 9a's Route Handlers (built for full-page redirect flows);
+  a Server Action is for a client component invoking server logic directly, called straight from
+  `useMutation`'s `mutationFn`. First use of `useMutation` in the project at all — everything
+  through slice 8 was read-only (`useQuery`/`useSuspenseQuery`/`useInfiniteQuery`).
+  Verified `ToggleFavourite(animeId: Int)` and `Media.isFavourite: Boolean!` against the live
+  schema before writing the queries, same discipline as always. **Deliberately did not route the
+  initial `isFavourite` read through TanStack Query prefetch/hydration** like every other section
+  on this page — it becomes a one-time prop to `FavoriteButton`, never read via `useQuery` on the
+  client, so there's no client cache entry for it to populate; a plain `await` in
+  `favorite-section.tsx` is simpler and sufficient. This is the same "not everything server-fetched
+  needs TanStack Query" principle from slice 1, sharpened here by the value being viewer-specific
+  and non-shareable anyway. Optimistic update in `favorite-button.tsx` uses local `useState`
+  toggled in `onMutate`/rolled back in `onError` — not `queryClient.setQueryData`, since (per the
+  above) there's no query cache entry backing this value to update. Signed-out state shows a
+  disabled "Sign in to favorite" button rather than hiding the feature entirely.
+  **Tests**: `favorite-button.test.tsx` mocks the Server Action (not the hook) and covers the
+  signed-out disabled state, the optimistic flip on click, and rollback on failure — the rollback
+  test needed simplifying after a real flake: an instantly-rejecting mock collapsed the
+  optimistic-then-rollback sequence before the intermediate frame was observable, so that test
+  asserts the stable end state (reverted) rather than the fleeting intermediate one.
+  **Verified myself**: signed-out state renders the disabled prompt correctly on the live page, no
+  regressions elsewhere. **Confirmed by the user in a real browser**: the button sets, unsets, and
+  persists correctly across a refresh. Slice 9c is done.
+
+## Status: all originally-scoped slices (1 through 9) are complete
+
+Everything in the original plan is built, tested, and verified against the live API. What's left
+is a set of explicitly-deferred follow-ups logged along the way — see "Known deferred follow-ups"
+below — none blocking, all optional.
+
 ### Up next
 
-- **Slice 9 (explicitly deferred) — authenticated AniList mutations.** Not started until
-  everything above is solid, per the original requirements.
+Nothing currently planned. See "Known deferred follow-ups" for a menu of optional next steps if
+picking this back up.
+
+## Known deferred follow-ups
+
+Things explicitly flagged as "not now" during earlier slices, kept here as a single list rather
+than scattered through the Done section above:
+
+- **GraphQL fragment extraction** (flagged in slice 4, re-flagged in slice 7 once a 3rd/4th
+  consumer existed) — `AnimeCardData`'s field selection is currently kept in sync by hand across
+  `trending`, `search`, `relations`, and `recommendations` queries. A shared fragment (using the
+  generated `useFragment` masking helper, unused since slice 1) would make that guarantee
+  automatic instead of disciplined.
+- **Filter value validation** (slice 5) — `search-results.tsx`'s `as SearchFilters["format"]`
+  casts are type assertions, not runtime validation. A hand-edited URL like `/search?format=banana`
+  reaches AniList as an invalid enum and returns a GraphQL error with no graceful handling.
+- **Multi-select genre / live `GenreCollection` fetch** (slice 5) — genre filter is single-select
+  and the option list is hardcoded rather than fetched from AniList.
+- **True infinite scroll** (slice 6) — currently a "Load more" button; `IntersectionObserver` +
+  `useEffect` auto-loading was the alternative, deliberately not built.
+- **`global-error.tsx`** (slice 8) — root layout failures aren't caught by any error boundary
+  (only `page.tsx` and below are). Skipped because the root layout does zero data fetching,
+  genuinely low risk right now.
+- **Token expiry handling** (slice 9a) — AniList tokens last ~1 year with no refresh mechanism;
+  there's no UI yet for "your session expired, please sign in again" — an expired token just
+  silently falls back to the signed-out state.
 
 ## Comprehension check log
 

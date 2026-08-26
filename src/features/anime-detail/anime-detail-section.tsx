@@ -6,6 +6,7 @@ import { getQueryClient } from "@/lib/query/get-query-client";
 
 import { AnimeDetail } from "./anime-detail";
 import { CharactersList } from "./characters-list";
+import { FavoriteSection } from "./favorite-section";
 import {
   animeCharactersQueryOptions,
   animeDetailQueryOptions,
@@ -47,6 +48,10 @@ export async function AnimeDetailSection({ id }: { id: number }) {
       <div className="flex flex-col gap-10">
         <Suspense fallback={<AnimeDetailSkeleton />}>
           <AnimeDetail id={id} />
+        </Suspense>
+
+        <Suspense fallback={null}>
+          <FavoriteSection id={id} />
         </Suspense>
 
         <Suspense fallback={<ListSkeleton />}>

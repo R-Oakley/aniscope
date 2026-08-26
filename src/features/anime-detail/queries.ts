@@ -79,6 +79,26 @@ export const animeRelationsQuery = graphql(`
   }
 `);
 
+export const mediaFavouriteStatusQuery = graphql(`
+  query MediaFavouriteStatus($id: Int!) {
+    Media(id: $id, type: ANIME, isAdult: false) {
+      isFavourite
+    }
+  }
+`);
+
+export const toggleFavouriteAnimeMutation = graphql(`
+  mutation ToggleFavouriteAnime($animeId: Int) {
+    ToggleFavourite(animeId: $animeId) {
+      anime {
+        pageInfo {
+          total
+        }
+      }
+    }
+  }
+`);
+
 export const animeRecommendationsQuery = graphql(`
   query AnimeRecommendations($id: Int!) {
     Media(id: $id, type: ANIME, isAdult: false) {
