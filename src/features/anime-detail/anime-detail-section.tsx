@@ -32,9 +32,10 @@ export async function AnimeDetailSection({ id }: { id: number }) {
   // (including the already-resolved hero content above) on the slowest of
   // them. The `pending`-status clause in get-query-client.ts's
   // shouldDehydrateQuery is what makes an un-awaited prefetch like this
-  // still reach the client via the hydration payload. The .catch() is only
-  // to stop Node from logging an unhandled-rejection warning if one fails —
-  // it is not real error handling (that's still slice 8's job).
+  // still reach the client via the hydration payload. The .catch() only
+  // stops Node from logging an unhandled-rejection warning here; if one of
+  // these fails, the client retries fresh after mount, and if that also
+  // fails, error.tsx (this route's error boundary) is what catches it now.
   queryClient.prefetchQuery(animeCharactersQueryOptions(id)).catch(() => {});
   queryClient.prefetchQuery(animeRelationsQueryOptions(id)).catch(() => {});
   queryClient
@@ -64,7 +65,7 @@ export async function AnimeDetailSection({ id }: { id: number }) {
   );
 }
 
-function AnimeDetailSkeleton() {
+export function AnimeDetailSkeleton() {
   return (
     <div className="flex flex-col gap-6 sm:flex-row">
       <div className="h-72 w-48 shrink-0 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />

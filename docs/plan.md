@@ -269,10 +269,51 @@ time forward).
   (possibly imperfectly stripped) output can ever be interpreted as markup. Verified fixed against
   the live running page, not just the unit tests.
 
+- **Slice 8 — Loading/error polish.** All three special files (`loading.tsx`, `error.tsx`,
+  `not-found.tsx`) follow the exact same folder-nesting rule as `layout.tsx`. Checked the docs
+  first and found a real version-specific trap: this Next version's `error.tsx` takes a `retry`
+  prop, not the `reset` prop shown in older Next docs/tutorials. Reused the skeleton components
+  already built inside `trending-anime-section.tsx`/`anime-detail-section.tsx` (exported them)
+  for the route-level `loading.tsx` fallbacks rather than inventing new markup. One `error.tsx`
+  per route (not one generic catch-all) for tailored copy, closing several "known gap" items
+  logged earlier (slice 5's invalid-filter-enum case, slice 7's failed-background-prefetch case).
+  Distinguished `error.tsx` (unexpected thrown errors) from `not-found.tsx` (the deliberate
+  `notFound()` signal we've called since slice 3, previously falling back to Next's unstyled
+  default) — added both a root `not-found.tsx` and a more specific `anime/[id]/not-found.tsx`
+  (same nesting/override rule again). Did **not** add `global-error.tsx` — that's specifically for
+  root *layout* failures, and our root layout does zero data fetching, genuinely low-risk.
+
+  **A real mistake, caught by re-verifying rather than assuming the fix worked**: adding
+  `loading.tsx` at `/anime/[id]` silently broke something slice 3 explicitly verified — nonexistent
+  and malformed anime ids started returning HTTP `200` instead of `404`. Root cause (confirmed via
+  the docs' "Status Codes" section): a `loading.tsx`'s Suspense fallback starts streaming the
+  response immediately, which commits the status code before `notFound()` (which runs later, after
+  `await params` and the prefetch) ever gets a chance to influence it — documented, expected Next
+  behavior (streamed not-found responses get `200` + an auto-injected `noindex` meta tag, not a
+  true `404`). Presented the tradeoff to the user rather than deciding unilaterally: drop the
+  loading skeleton for this route to preserve the verified-correct 404, or keep it and accept
+  `200`+`noindex`. Chose to drop it — **but my first attempt (deleting only
+  `anime/[id]/loading.tsx`) did not fix it**, and re-running the exact same curl checks (not
+  assuming the deletion worked) proved that immediately: still `200`. Root cause of *that*: a
+  `loading.tsx` cascades to every descendant route the same way a `layout.tsx` does — the *root*
+  `src/app/loading.tsx` (added for the homepage) was still wrapping `/anime/[id]` in a Suspense
+  boundary, since that route had no more-specific `loading.tsx` of its own to override it. This is
+  the exact nesting rule already documented above for `layout.tsx` — just applied incorrectly on
+  the first pass, and only caught because the fix was re-verified against the live server instead
+  of trusted on sight. Real fix: moved the homepage's `page.tsx` and `loading.tsx` into a
+  `src/app/(home)/` **route group** — route groups don't affect the URL (`/` still resolves the
+  same), but they do properly scope a `loading.tsx`'s cascading Suspense boundary to only the
+  routes inside that group, so `/anime/[id]` and `/search` are no longer affected by it.
+  `/search/loading.tsx` was never actually part of this problem (it's correctly scoped to its own
+  segment, and `/search` has no `notFound()` call to conflict with streaming anyway). Re-verified
+  every route after the route-group fix: homepage 200 with skeleton path intact, nonexistent/
+  malformed anime ids both back to 404, valid anime page 200, search 200, unmatched route 404 via
+  root `not-found.tsx`. Added `src/app/error.test.tsx` (retry button behavior) as the one
+  representative test for this slice — the rest are static skeleton/copy, low value to test
+  exhaustively.
+
 ### Up next
 
-- **Slice 8 — Loading/error polish.** Route-level `loading.tsx`/`error.tsx`, meaningful skeletons
-  instead of generic spinners.
 - **Slice 9 (explicitly deferred) — authenticated AniList mutations.** Not started until
   everything above is solid, per the original requirements.
 
@@ -350,4 +391,27 @@ re-explain from zero, but also don't assume mastery we haven't checked.
   core detail query stays `await`ed while the other three don't (the `notFound()` decision depends
   on it); the payoff of slice 2's previously-inert `pending` dehydration clause; the precise
   (corrected) sequencing of the three background prefetches — after the core query, concurrent with
-  each other, not racing from function entry. *Explained; comprehension check pending.*
+  each other, not racing from function entry. *Explained in depth at user's request rather than
+  guessed through*: (1) why one combined query couldn't give independent streaming — GraphQL has
+  no partial-response mechanism, and one operation = one queryKey = one all-or-nothing Suspense
+  boundary; (2) the precise difference between the awaited core `prefetchQuery` and the un-awaited
+  `.catch(() => {})` ones — `await` gives natural error propagation, the un-awaited calls have
+  nothing observing them so `.catch()` exists purely to stop Node's unhandled-rejection warning,
+  not as real error handling (that gap has since been closed by slice 8's `error.tsx`); (3) why
+  `AnimeCard` needed zero changes for two query shapes it predates — hand-authored structural
+  interface with every field optional, plus deliberately mirroring the same field selection across
+  queries by discipline (the exact risk the still-deferred GraphQL fragment extraction would
+  remove).
+- Slice 8: `loading.tsx`/`error.tsx`/`not-found.tsx` nest exactly like `layout.tsx` (direct
+  continuation of the layout-nesting question from the prior conversation turn); `error.tsx` vs
+  `not-found.tsx` are for genuinely different situations (unexpected throws vs. deliberate
+  `notFound()`); this Next version's `error.tsx` prop is `retry`, not the `reset` shown in older
+  docs. The real content here wasn't explained so much as *lived through*: a `loading.tsx`'s
+  Suspense fallback commits the response status code before a later `notFound()` call can influence
+  it (streamed not-found = `200`+`noindex`, not a true `404`) — and fixing it by deleting only the
+  nested `loading.tsx` looked done but wasn't, because the *root* `loading.tsx` cascades to
+  descendant routes the same way a layout does. Caught only because the fix was re-verified against
+  the live server rather than trusted on sight. Route groups (`(home)/`) are what actually scope a
+  loading/layout boundary to a subset of routes without affecting the URL. *No explicit Q&A this
+  time — narrated in detail in the Done section above instead, given how much of it was the
+  debugging process itself rather than a settled explanation.*

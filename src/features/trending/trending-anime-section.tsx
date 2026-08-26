@@ -19,7 +19,7 @@ export async function TrendingAnimeSection({ perPage }: { perPage: number }) {
   );
 }
 
-function TrendingAnimeSkeleton({ perPage }: { perPage: number }) {
+export function TrendingAnimeSkeleton({ perPage }: { perPage: number }) {
   return (
     <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5">
       {Array.from({ length: perPage }).map((_, i) => (
