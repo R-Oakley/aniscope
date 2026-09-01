@@ -65,4 +65,21 @@ describe("SearchInput", () => {
 
     expect(replace).toHaveBeenLastCalledWith("/search", { scroll: false });
   });
+
+  it("resyncs the displayed value when the URL's q changes externally", () => {
+    // Simulates the browser back button: searchParams changes without
+    // SearchInput's own debounce having caused it. Local `value` state
+    // (needed for instant keystroke echo) must not be left stale once that
+    // happens.
+    (useSearchParams as jest.Mock).mockReturnValue(new URLSearchParams("q=naruto"));
+    const { rerender } = render(<SearchInput />);
+    expect(screen.getByPlaceholderText("Search anime...")).toHaveValue(
+      "naruto",
+    );
+
+    (useSearchParams as jest.Mock).mockReturnValue(new URLSearchParams());
+    rerender(<SearchInput />);
+
+    expect(screen.getByPlaceholderText("Search anime...")).toHaveValue("");
+  });
 });
